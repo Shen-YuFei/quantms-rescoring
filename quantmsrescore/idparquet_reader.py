@@ -403,6 +403,7 @@ class ParquetRescoringReader(ParquetReader):
         self._stats = SpectrumStats()
         instrument = OpenMSHelper.get_instrument(self.exp)
         merged_records = {}
+        identification_indices = {}
 
         for parquet_dir in self.parquet_dirs:
             psms_file = parquet_dir / "psms.parquet"
@@ -489,6 +490,15 @@ class ParquetRescoringReader(ParquetReader):
                             record["higher_score_better"] = False
                     merged_psms[prov_key] = copy.copy(psm)
                     record["psm_metavalues"] = psm_metavalues
+                    if len(self.parquet_dirs) > 1:
+                        # Preserve each source identification's metadata: even
+                        # the same spectrum can have different RT/m/z per engine.
+                        identification_key = (
+                            parquet_dir, row["run_identifier"], row["peptide_identification_index"]
+                        )
+                        record["peptide_identification_index"] = identification_indices.setdefault(
+                            identification_key, len(identification_indices)
+                        )
                     merged_records[prov_key] = copy.copy(record)
                 else:
                     # Same rule as above: whenever the stored score is replaced
@@ -518,6 +528,15 @@ class ParquetRescoringReader(ParquetReader):
         self._psms = PSMList(psm_list=list(merged_psms.values()))
         self._psms_df = pd.DataFrame(merged_records.values())
         self._psms_df["run_identifier"] = run_identifier
+        if len(self.parquet_dirs) > 1 and not self._psms_df.empty:
+            # Deduplication can remove hits; number the retained candidates in
+            # each identification without changing their order or search rank.
+            self._psms_df["peptide_identification_index"] = self._psms_df[
+                "peptide_identification_index"
+            ].astype("int32")
+            self._psms_df["hit_index"] = self._psms_df.groupby(
+                "peptide_identification_index", sort=False
+            ).cumcount().astype("int32")
 
         # Two-engine (comet + msgf) consensus merge: build the union Percolator
         # feature table (rich per-engine features + orientation-aware worst-case
