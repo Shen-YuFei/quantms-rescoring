@@ -224,8 +224,11 @@ def calculate_correlations(results: List[Any]) -> None:
     """
     for result in results:
         if result.predicted_intensity and result.observed_intensity:
-            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
-            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
+            # Rust returns ion maps with unspecified insertion order. Align
+            # observed and predicted arrays by ion type, never by dict order.
+            ion_types = list(result.predicted_intensity)
+            pred_int = np.concatenate([result.predicted_intensity[ion] for ion in ion_types])
+            obs_int = np.concatenate([result.observed_intensity[ion] for ion in ion_types])
             result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
         else:
             result.correlation = None

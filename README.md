@@ -413,11 +413,25 @@ For environments without internet access (e.g., HPC clusters), you can download 
 
 This command downloads models for:
 
-- **MS2PIP**: Fragment ion intensity prediction models (bundled with ms2pip package)
+- **MS2PIP**: Fragment ion intensity prediction models downloaded and validated against the installed MS2PIP model registry.
 - **AlphaPeptDeep**: MS2 spectrum, retention time, and CCS prediction models
 
 > **Note**: DeepLC does not require a separate model download — it is handled internally by the DeepLC package.
 Once downloaded, you can transfer the models to your offline environment and use them with the processing commands. For AlphaPeptDeep models, use the `--ms2_model_dir` option when running `msrescore2feature`.
+
+MS2PIP 4.2 accepts fragment tolerances in either `Da` or `ppm` through
+`msrescore2feature --ms2_tolerance <value> --ms2_tolerance_unit <unit>`.
+The OpenMS spectrum reader is retained, while spectrum annotation and prediction
+use the public MS2PIP API. The 71 MS2Rescore features keep their existing names;
+unavailable correlations count as unsuccessful predictions during model validation.
+`--processes` sets the Rust/XGBoost thread budget and the feature-worker count.
+Rust initializes its thread pool on the first calculation, so use a fresh CLI
+process when changing that budget.
+
+This upgrade does not promise identical features to MS2PIP 4.1.2. MS2PIP 4.2
+uses a different spectrum annotation backend, including nearest-m/z matching
+and neutral-loss annotations. Keep the MS2PIP version fixed when comparing
+rescoring results across runs.
 
 ### Issues and Contributions
 
