@@ -4,6 +4,7 @@ import os.path
 import numpy as np
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore import __version__
+from quantmsrescore.constants import PRIMARY_SCORE_IMPUTED
 
 logger = get_logger(__name__)
 
@@ -729,6 +730,7 @@ class ParquetRescoringReader(ParquetReader):
         for psm in self._psms.psm_list:
             score = getattr(psm, "score", None)
             if score is None or not np.isfinite(score):
+                psm.metadata = {**(psm.metadata or {}), PRIMARY_SCORE_IMPUTED: "true"}
                 psm.score = score_fallback
 
     def _sentinel_score_fallback(self, engines, worst) -> float:

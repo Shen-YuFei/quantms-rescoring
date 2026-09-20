@@ -8,6 +8,8 @@ import pyopenms as oms
 import pytest
 from click.testing import CliRunner
 
+from quantmsrescore.constants import PRIMARY_SCORE_IMPUTED
+from quantmsrescore.idparquet_reader import ParquetRescoringReader
 from quantmsrescore.psm_clean import psm_feature_clean
 from quantmsrescore.utils import ParquetReader
 
@@ -144,3 +146,14 @@ def test_single_source_keeps_original_indices(tmp_path, identification_inputs):
     rows = _clean([msgf], mzml, tmp_path / "single.idparquet").to_pylist()
     for field in ("peptidoform", "peptide_identification_index", "hit_index", "psm_metavalues"):
         assert [row[field] for row in rows] == [row[field] for row in original]
+
+
+def test_only_imputed_primary_scores_are_marked_for_calibration(identification_inputs):
+    comet, msgf, mzml, _, _ = identification_inputs
+    reader = ParquetRescoringReader([comet, msgf], mzml)
+    # An observed worst score and its imputed replacement can be identical.
+    # Eligibility must follow provenance, rather than a numeric cutoff.
+    assert [psm.score for psm in reader.psms] == [0.01] * 4
+    assert [psm.metadata.get(PRIMARY_SCORE_IMPUTED) for psm in reader.psms] == [
+        None, None, "true", "true"
+    ]

@@ -18,7 +18,7 @@ from ms2rescore.utils import infer_spectrum_path
 from ms2rescore_rs import MS2Spectrum, Precursor
 from psm_utils import Peptidoform, PSMList
 
-from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
+from quantmsrescore.constants import PRIMARY_SCORE_IMPUTED, SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.logging_config import configure_worker_process, get_logger
 from quantmsrescore.openms import (
     OpenMSHelper,
@@ -214,11 +214,15 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             ms2pip_results.copy()
         )  # Copy ms2pip results to avoid modifying the original list
 
-        # Select only PSMs that are target and not decoys
+        # The calibration fraction is relative to observed primary scores.
+        # Other engines' candidates receive an imputed primary score during
+        # merging; counting them would enlarge this engine's top-scoring set.
+        # They remain in the full PSM list for feature generation and rescoring.
         ms2pip_results_copy = [
             result
             for result in ms2pip_results_copy
             if not result.psm.is_decoy and result.psm.rank == 1
+            and (result.psm.metadata or {}).get(PRIMARY_SCORE_IMPUTED) != "true"
         ]
         # Sort ms2pip results by PSM score and lower score is better
         ms2pip_results_copy.sort(key=lambda x: x.psm.score, reverse=higher_score_better)

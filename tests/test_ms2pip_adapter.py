@@ -12,6 +12,7 @@ from psm_utils import PSM, PSMList
 
 from quantmsrescore import model_downloader
 from quantmsrescore import ms2pip as adapter
+from quantmsrescore.constants import PRIMARY_SCORE_IMPUTED
 from quantmsrescore.openms import calculate_correlations
 
 
@@ -118,6 +119,30 @@ def test_missing_correlations_do_not_pass_model_validation(correlations):
 def test_model_validation_still_accepts_valid_predictions():
     result = ProcessingResult(psm_index=0, psm=make_psm(), correlation=0.9)
     assert adapter.MS2PIPAnnotator()._validate_scores([result], 1.0, 0.7, 0.6, True)
+
+
+@pytest.mark.parametrize("higher_better", [False, True])
+def test_imputed_primary_scores_do_not_expand_calibration_set(higher_better):
+    results = []
+    for i in range(200):
+        psm = make_psm(str(i))
+        psm.score = -float(i) if higher_better else float(i)
+        if i >= 100:
+            psm.metadata[PRIMARY_SCORE_IMPUTED] = "true"
+        results.append(ProcessingResult(
+            psm_index=i, psm=psm, correlation=0.9 if i < 15 else 0.1
+        ))
+    generator = adapter.MS2PIPAnnotator()
+    assert generator._validate_scores(results[:100], 0.15, 0.7, 0.7, higher_better)
+    assert generator._validate_scores(results, 0.15, 0.7, 0.7, higher_better)
+    assert len(results) == 200
+
+
+def test_all_imputed_primary_scores_cannot_validate_model():
+    psm = make_psm()
+    psm.metadata[PRIMARY_SCORE_IMPUTED] = "true"
+    result = ProcessingResult(psm_index=0, psm=psm, correlation=1.0)
+    assert not adapter.MS2PIPAnnotator()._validate_scores([result], 1.0, 0.7, 0.7, False)
 
 
 def test_features_attach_to_original_index():
